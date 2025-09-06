@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elsy Ventas</title>
+
+  <!-- Librería para leer archivos CSV desde Google Sheets -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+  <style>
+    /* ========= CURSOR PERSONALIZADO ========= */
+    :root{
+      --cursor-size: 64px;          /* tamaño visible del cursor */
+      --cursor-hotspot-x: 32px;     /* punto activo X (desde la izquierda) */
+      --cursor-hotspot-y: 32px;     /* punto activo Y (desde arriba) */
+      --cursor-image: url('https://static.vecteezy.com/system/resources/thumbnails/048/725/547/small/simple-beautiful-arrow-graphics-png.png');
+    }
+    .custom-cursor{
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--cursor-size);
+      height: var(--cursor-size);
+      background-image: var(--cursor-image);
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;          /* no bloquea clics */
+      z-index: 3000;                 /* sobre todo */
+      transform: translate(calc(-1 * var(--cursor-hotspot-x)), calc(-1 * var(--cursor-hotspot-y)));
+    }
+
+    /* ======== ESTILOS GENERALES ======== */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Fuente del sitio */
+      background: linear-gradient(135deg, #FF8C00 0%, #000000 100%); /* Fondo con degradado */
+      min-height: 100vh; /* Altura mínima pantalla completa */
+      margin: 0;
+      padding: 20px;
+      color: #333; /* Color de texto principal */
+
+      /* Selección de texto general y menú táctil */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+
+      /* Ocultar cursor nativo (usamos el custom) */
+      cursor: none;
+    }
+
+    /* Permitir seleccionar/copiar en inputs/textarea si hace falta */
+    input, textarea, [contenteditable="true"], [contenteditable=true]{
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+
+    /* Contenedor central */
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* Encabezado */
+    .header { text-align: center; margin-bottom: 40px; color: white; }
+    .header h1 { font-size: 2.5rem; margin: 0; } /* Título principal */
+
+    /* ======== BARRA DE BÚSQUEDA ======== */
+    .search-bar { display: flex; justify-content: center; margin: 20px 0; }
+    .search-bar input {
+      width: 100%; max-width: 500px; /* Ajusta el ancho máximo de la barra */
+      padding: 12px 18px;
+      border-radius: 25px; /* Bordes redondeados */
+      border: none;
+      outline: none;
+      font-size: 1rem;
+    }
+
+    /* ======== BOTONES DE CATEGORÍA ======== */
+    .categories { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 25px; }
+    .category-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 20px;
+      /* el cursor nativo está oculto globalmente */
+      background: rgba(255,255,255,0.9); /* Fondo por defecto */
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+    .category-btn:hover, .category-btn.active {
+      background: linear-gradient(135deg,#FF8C00 0%,#000000 100%); /* Fondo al seleccionar */
+      color: white;
+    }
+
+    /* ======== TARJETAS DE PRODUCTOS ======== */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); /* Cuántas columnas caben según ancho */
+      gap: 20px;
+    }
+    .product-card {
+      background: white;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.15); /* Sombra */
+      transition: transform 0.2s;
+    }
+    .product-card:hover { transform: translateY(-5px); } /* Efecto hover */
+    .product-image { width: 100%; height: 200px; object-fit: cover; } /* Tamaño imagen producto */
+    .product-info { padding: 15px; }
+    .product-name { font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
+    .product-price { font-size: 1.2rem; color: #FF8C00; font-weight: bold; margin-bottom: 5px; } /* Color precio */
+    .product-category {
+      font-size: 0.9rem;
+      background: #eee;
+      padding: 2px 10px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+
+    /* ======== BOTÓN "CARGAR MÁS" ======== */
+    .load-more {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 25px;
+      background: white;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .load-more:hover {
+      background: linear-gradient(135deg,#FF8C00 0%,#000000 100%);
+      color: white;
+    }
+
+    /* ======== MODAL ======== */
+    .modal {
+      display: none; /* Oculto por defecto */
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); /* Fondo oscuro */
+      justify-content: center; align-items: center;
+      padding: 15px;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 15px;
+      max-width: 850px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .modal-header {
+      padding: 20px;
+      background: linear-gradient(135deg,#FF8C00,#000000);
+      color: white;
+      border-radius: 15px 15px 0 0;
+      position: relative;
+    }
+    .close { position: absolute; right: 20px; top: 20px; font-size: 28px; }
+    .modal-body { padding: 20px; }
+
+    /* ======== CARRUSEL DE IMÁGENES ======== */
+    .carousel { position: relative; margin-bottom: 20px; text-align: center; }
+    .carousel img {
+      max-width: 100%; max-height: 350px;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+    .carousel-btn {
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      background: rgba(0,0,0,0.5);
+      color: white;
+      border: none;
+      font-size: 22px;
+      padding: 10px;
+      border-radius: 50%;
+    }
+    .carousel-btn.left { left: 15px; }
+    .carousel-btn.right { right: 15px; }
+
+    /* Precio dentro del modal */
+    .modal-price { font-size: 1.5rem; color: #FF8C00; font-weight: bold; margin-bottom: 12px; }
+
+    /* Contenedor de botones de compartir */
+    .share-container { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+    .share-btn {
+      background: linear-gradient(135deg,#FF8C00,#000000);
+      color: white; border: none;
+      padding: 10px 18px; border-radius: 20px;
+      font-weight: bold;
+    }
+    .share-url {
+      flex: 1; padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      min-width: 200px;
+    }
+
+    /* ======== LIGHTBOX (imagen fullscreen) ======== */
+    .lightbox {
+      display: none;
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.95);
+      justify-content: center; align-items: center;
+      z-index: 2000;
+    }
+    .lightbox img {
+      max-width: 90%; max-height: 90%;
+      object-fit: contain;
+    }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 30px;
+      font-size: 35px;
+      color: white;
+      font-weight: bold;
+    }
+
+    /* ======== RESPONSIVE (móviles) ======== */
+    @media (max-width: 600px) {
+      .product-image { height: 160px; }
+      .modal-content { width: 95%; }
+      .carousel img { max-height: 250px; }
+      .product-name { font-size: 1rem; }
+      .product-price { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Cursor personalizado (no tocar la estructura; puedes cambiar tamaño en :root) -->
+  <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
+
+  <div class="container">
+    <!-- ======== ENCABEZADO PRINCIPAL ======== -->
+    <div class="header">
+      <h1>🛍️ Elsy Ventas 🐦‍🔥</h1>
+      <p>Descubre nuestros increíbles productos</p>
+    </div>
+
+    <!-- 🔍 Barra de búsqueda -->
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Buscar productos...">
+    </div>
+
+    <!-- Botones dinámicos de categorías -->
+    <div id="categories" class="categories"></div>
+
+    <!-- Grid de productos -->
+    <div id="productsGrid" class="products-grid"></div>
+
+    <!-- Botón para cargar más productos -->
+    <button id="loadMoreBtn" class="load-more">Cargar más</button>
+  </div>
+
+  <!-- ======== MODAL DETALLE PRODUCTO ======== -->
+  <div id="productModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalTitle"></span>
+        <span class="close" onclick="closeModal()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <!-- 🖼️ Carrusel imágenes -->
+        <div class="carousel">
+          <button class="carousel-btn left" onclick="prevImage()">&#10094;</button>
+          <img id="carouselImage" src="" alt="Imagen producto" onclick="openLightbox()">
+          <button class="carousel-btn right" onclick="nextImage()">&#10095;</button>
+        </div>
+        <div id="modalPrice" class="modal-price"></div>
+        <div id="modalDescription"></div>
+        <!-- Compartir producto -->
+        <div class="share-container">
+          <button id="shareBtn" class="share-btn">🔗 Generar Link</button>
+          <input type="text" id="shareUrl" class="share-url" readonly />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== LIGHTBOX (imagen fullscreen) ======== -->
+  <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-close">&times;</span>
+    <img id="lightboxImage" src="">
+  </div>
+
+  <!-- ======== JAVASCRIPT (lógica del catálogo + seguridad y cursor) ======== -->
+  <script>
+    /* ========== BLOQUEOS: clic derecho / copiar / arrastrar ========== */
+    document.addEventListener("contextmenu", e => e.preventDefault());        // clic derecho
+    document.addEventListener("dragstart", e => e.preventDefault());         // arrastrar elementos/imagenes
+    document.addEventListener("copy", e => {
+      const t = e.target;
+      // Permitir copiar desde inputs/textarea si lo deseas; fuera de ellos, bloquear
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+    });
+
+    /* ========== CURSOR PERSONALIZADO SEGUIDOR ========== */
+    (function(){
+      const cur = document.getElementById('customCursor');
+      // Evitar mostrar cursor custom mientras no hay movimiento (opcional)
+      let visible = false;
+      document.addEventListener('mousemove', (e)=>{
+        if(!visible){ cur.style.display = 'block'; visible = true; }
+        cur.style.left = e.clientX + 'px';
+        cur.style.top  = e.clientY + 'px';
+      });
+      // Ocultar en iframes/limites si pierdes el foco del documento
+      document.addEventListener('mouseleave', ()=>{ cur.style.display = 'none'; visible = false; });
+    })();
+
+    /* =================== CATÁLOGO (tu lógica original) =================== */
+
+    /* Variables globales */
+    let products = []; // Lista de productos cargados
+    let currentProduct = null; // Producto actualmente abierto en el modal
+    let currentImages = []; // Lista de imágenes del producto actual
+    let currentIndex = 0; // Índice de la imagen en el carrusel
+
+    let visibleCount = 12; // Cuántos productos mostrar inicialmente
+    const perPage = 12;    // Cuántos productos cargar por página
+
+    /* URL del archivo CSV de Google Sheets */
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMHSCo3Fnmvpys4u0f2ryi59rBd5_jpHjSoyqXfyBNuL8bOXjvKzx1ns2mxZN2akZ7h9DWOUhymCsj/pub?gid=0&single=true&output=csv";
+
+    /* Carga de datos desde Google Sheets */
+    fetch(sheetUrl)
+      .then(res => res.text())
+      .then(csv => {
+        Papa.parse(csv, {
+          header: true, // Usa encabezados del CSV como keys
+          skipEmptyLines: true,
+          complete: function(results) {
+            products = results.data.filter(p => p.nombre && p.precio && p.categoria);
+            createCategoryButtons();
+            displayProducts();
+            loadFromUrl(); // Verifica si hay un producto en la URL
+          }
+        });
+      });
+
+    /* Crear botones de categoría */
+    function createCategoryButtons() {
+      const cats = [...new Set(products.map(p => p.categoria))];
+      const categoriesDiv = document.getElementById("categories");
+      categoriesDiv.innerHTML = `<button class="category-btn active" onclick="filterProducts('todos', this)">Todos</button>`;
+      cats.forEach(cat => {
+        categoriesDiv.innerHTML += `<button class="category-btn" onclick="filterProducts('${cat}', this)">${cat}</button>`;
+      });
+    }
+
+    /* Filtrar productos por categoría */
+    function filterProducts(cat, btn) {
+      document.querySelectorAll(".category-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentCategory = cat;
+      visibleCount = perPage;
+      displayProducts(cat);
+    }
+
+    /* Mostrar productos en la cuadrícula */
+    function displayProducts(cat="todos") {
+      const grid = document.getElementById("productsGrid");
+      const searchText = document.getElementById("searchInput").value.toLowerCase();
+
+      let filtered = products.filter(p =>
+        (cat==="todos" || p.categoria===cat) &&
+        (p.nombre.toLowerCase().includes(searchText) || (p.descripcion||"").toLowerCase().includes(searchText))
+      );
+
+      let toShow = filtered.slice(0, visibleCount);
+
+      if (toShow.length===0) {
+        grid.innerHTML = "<p style='color:white;'>No hay coincidencias con tu búsqueda</p>";
+        document.getElementById("loadMoreBtn").style.display = "none";
+        return;
+      }
+
+      grid.innerHTML = toShow.map(p => `
+        <div class="product-card" onclick="openModal('${p.nombre}')">
+          <img class="product-image" src="${p.imagen1 || 'https://via.placeholder.com/250x200?text=Sin+Imagen'}" alt="${p.nombre}">
+          <div class="product-info">
+            <div class="product-name">${p.nombre}</div>
+            <div class="product-price">$${parseFloat(p.precio).toLocaleString('es-CO')}</div>
+            <div class="product-category">${p.categoria}</div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById("loadMoreBtn").style.display = filtered.length > visibleCount ? "block" : "none";
+    }
+
+    /* Botón cargar más */
+    document.getElementById("loadMoreBtn").onclick = function() {
+      visibleCount += perPage;
+      displayProducts(currentCategory);
+    };
+
+    /* Buscar productos en tiempo real */
+    document.getElementById("searchInput").addEventListener("input", () => {
+      visibleCount = perPage;
+      displayProducts(currentCategory);
+    });
+
+    /* Abrir modal con detalle del producto */
+    function openModal(name) {
+      const product = products.find(p => p.nombre === name);
+      if (!product) return;
+      currentProduct = product;
+
+      document.getElementById("modalTitle").textContent = product.nombre;
+      document.getElementById("modalPrice").textContent = "$" + parseFloat(product.precio).toLocaleString('es-CO');
+      document.getElementById("modalDescription").textContent = product.descripcion || "Sin descripción disponible";
+
+      currentImages = [product.imagen1, product.imagen2, product.imagen3, product.imagen4, product.imagen5].filter(Boolean);
+      currentIndex = 0;
+      updateCarousel();
+
+      document.getElementById("productModal").style.display = "flex";
+      document.body.style.overflow = "hidden"; /* Evita scroll del body */
+    }
+
+    /* Cerrar modal */
+    function closeModal() {
+      document.getElementById("productModal").style.display = "none";
+      currentProduct = null;
+      document.body.style.overflow = "auto";
+    }
+
+    /* Actualizar carrusel */
+    function updateCarousel() {
+      if (currentImages.length > 0) {
+        document.getElementById("carouselImage").src = currentImages[currentIndex];
+      } else {
+        document.getElementById("carouselImage").src = "https://via.placeholder.com/400x200?text=Sin+Imagen";
+      }
+    }
+    function prevImage() {
+      if (currentImages.length > 0) {
+        currentIndex = (currentIndex - 1 + currentImages.length) % currentImages.length;
+        updateCarousel();
+      }
+    }
+    function nextImage() {
+      if (currentImages.length > 0) {
+        currentIndex = (currentIndex + 1) % currentImages.length;
+        updateCarousel();
+      }
+    }
+
+    /* Lightbox (imagen fullscreen) */
+    function openLightbox() {
+      document.getElementById("lightboxImage").src = currentImages[currentIndex];
+      document.getElementById("lightbox").style.display = "flex";
+    }
+    function closeLightbox() {
+      document.getElementById("lightbox").style.display = "none";
+    }
+
+    /* Compartir producto */
+    document.getElementById("shareBtn").onclick = function() {
+      if (!currentProduct) return;
+      const base = window.location.origin + window.location.pathname;
+      const link = base + "?producto=" + encodeURIComponent(currentProduct.nombre);
+      const shareUrl = document.getElementById("shareUrl");
+      shareUrl.value = link;
+      navigator.clipboard.writeText(link).then(()=>{
+        this.textContent = "✅ Copiado!";
+        setTimeout(()=> this.textContent = "🔗 Generar Link", 2000);
+      });
+    };
+
+    /* Abrir producto desde link compartido */
+    function loadFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const prod = params.get("producto");
+      if (prod) openModal(decodeURIComponent(prod));
+    }
+
+    /* Cerrar modal/lightbox al hacer clic fuera */
+    window.onclick = function(e) {
+      if (e.target.id === "productModal") closeModal();
+      if (e.target.id === "lightbox") closeLightbox();
+    };
+
+    let currentCategory = "todos";
+  </script>
+</body>
+</html>
