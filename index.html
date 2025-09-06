@@ -118,6 +118,14 @@
       border-radius: 10px;
       display: inline-block;
     }
+    .product-stock {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 5px;
+    }
+    .stock-available { color: #28a745; font-weight: bold; }
+    .stock-low { color: #ffc107; font-weight: bold; }
+    .stock-out { color: #dc3545; font-weight: bold; }
 
     /* ======== BOTÓN "CARGAR MÁS" ======== */
     .load-more {
@@ -187,6 +195,7 @@
 
     /* Precio dentro del modal */
     .modal-price { font-size: 1.5rem; color: #FF8C00; font-weight: bold; margin-bottom: 12px; }
+    .modal-stock { font-size: 1.1rem; margin-bottom: 15px; }
 
     /* Contenedor de botones de compartir */
     .share-container { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
@@ -274,6 +283,7 @@
           <button class="carousel-btn right" onclick="nextImage()">&#10095;</button>
         </div>
         <div id="modalPrice" class="modal-price"></div>
+        <div id="modalStock" class="modal-stock"></div>
         <div id="modalDescription"></div>
         <!-- Compartir producto -->
         <div class="share-container">
@@ -330,6 +340,18 @@
     /* URL del archivo CSV de Google Sheets */
     const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMHSCo3Fnmvpys4u0f2ryi59rBd5_jpHjSoyqXfyBNuL8bOXjvKzx1ns2mxZN2akZ7h9DWOUhymCsj/pub?gid=0&single=true&output=csv";
 
+    /* Función para obtener el valor de stock formateado */
+    function formatStock(stock) {
+      const stockNum = parseInt(stock) || 0;
+      if (stockNum <= 0) {
+        return '<span class="stock-out">Sin stock</span>';
+      } else if (stockNum <= 5) {
+        return `<span class="stock-low">Quedan ${stockNum} unidades</span>`;
+      } else {
+        return `<span class="stock-available">Stock disponible (${stockNum})</span>`;
+      }
+    }
+
     /* Carga de datos desde Google Sheets */
     fetch(sheetUrl)
       .then(res => res.text())
@@ -338,7 +360,12 @@
           header: true, // Usa encabezados del CSV como keys
           skipEmptyLines: true,
           complete: function(results) {
-            products = results.data.filter(p => p.nombre && p.precio && p.categoria);
+            // Filtrar productos que tengan los campos esenciales
+            products = results.data.filter(p => 
+              p.Producto && 
+              p['Precio Público'] && 
+              (p.Categoría || p['Categoría 2'])
+            );
             createCategoryButtons();
             displayProducts();
             loadFromUrl(); // Verifica si hay un producto en la URL
@@ -348,7 +375,12 @@
 
     /* Crear botones de categoría */
     function createCategoryButtons() {
-      const cats = [...new Set(products.map(p => p.categoria))];
+      // Obtener categorías únicas de ambas columnas de categoría
+      const cats = [...new Set([
+        ...products.map(p => p.Categoría).filter(Boolean),
+        ...products.map(p => p['Categoría 2']).filter(Boolean)
+      ])];
+      
       const categoriesDiv = document.getElementById("categories");
       categoriesDiv.innerHTML = `<button class="category-btn active" onclick="filterProducts('todos', this)">Todos</button>`;
       cats.forEach(cat => {
@@ -370,29 +402,44 @@
       const grid = document.getElementById("productsGrid");
       const searchText = document.getElementById("searchInput").value.toLowerCase();
 
-      let filtered = products.filter(p =>
-        (cat==="todos" || p.categoria===cat) &&
-        (p.nombre.toLowerCase().includes(searchText) || (p.descripcion||"").toLowerCase().includes(searchText))
-      );
+      let filtered = products.filter(p => {
+        // Filtro de categoría
+        const matchCategory = cat === "todos" || 
+                            p.Categoría === cat || 
+                            p['Categoría 2'] === cat;
+        
+        // Filtro de búsqueda
+        const matchSearch = p.Producto.toLowerCase().includes(searchText) || 
+                          (p.Descripcion || "").toLowerCase().includes(searchText);
+        
+        return matchCategory && matchSearch;
+      });
 
       let toShow = filtered.slice(0, visibleCount);
 
-      if (toShow.length===0) {
+      if (toShow.length === 0) {
         grid.innerHTML = "<p style='color:white;'>No hay coincidencias con tu búsqueda</p>";
         document.getElementById("loadMoreBtn").style.display = "none";
         return;
       }
 
-      grid.innerHTML = toShow.map(p => `
-        <div class="product-card" onclick="openModal('${p.nombre}')">
-          <img class="product-image" src="${p.imagen1 || 'https://via.placeholder.com/250x200?text=Sin+Imagen'}" alt="${p.nombre}">
-          <div class="product-info">
-            <div class="product-name">${p.nombre}</div>
-            <div class="product-price">$${parseFloat(p.precio).toLocaleString('es-CO')}</div>
-            <div class="product-category">${p.categoria}</div>
+      grid.innerHTML = toShow.map(p => {
+        const price = parseFloat(p['Precio Público']) || 0;
+        const mainCategory = p.Categoría || p['Categoría 2'] || 'Sin categoría';
+        const stock = parseInt(p.Stock) || 0;
+        
+        return `
+          <div class="product-card" onclick="openModal('${p.Producto}')">
+            <img class="product-image" src="${p.img01 || 'https://via.placeholder.com/250x200?text=Sin+Imagen'}" alt="${p.Producto}">
+            <div class="product-info">
+              <div class="product-name">${p.Producto}</div>
+              <div class="product-price">$${price.toLocaleString('es-CO')}</div>
+              <div class="product-category">${mainCategory}</div>
+              <div class="product-stock">${formatStock(stock)}</div>
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       document.getElementById("loadMoreBtn").style.display = filtered.length > visibleCount ? "block" : "none";
     }
@@ -411,15 +458,27 @@
 
     /* Abrir modal con detalle del producto */
     function openModal(name) {
-      const product = products.find(p => p.nombre === name);
+      const product = products.find(p => p.Producto === name);
       if (!product) return;
       currentProduct = product;
 
-      document.getElementById("modalTitle").textContent = product.nombre;
-      document.getElementById("modalPrice").textContent = "$" + parseFloat(product.precio).toLocaleString('es-CO');
-      document.getElementById("modalDescription").textContent = product.descripcion || "Sin descripción disponible";
+      document.getElementById("modalTitle").textContent = product.Producto;
+      
+      const price = parseFloat(product['Precio Público']) || 0;
+      document.getElementById("modalPrice").textContent = "$" + price.toLocaleString('es-CO');
+      
+      document.getElementById("modalStock").innerHTML = formatStock(product.Stock);
+      document.getElementById("modalDescription").textContent = product.Descripcion || "Sin descripción disponible";
 
-      currentImages = [product.imagen1, product.imagen2, product.imagen3, product.imagen4, product.imagen5].filter(Boolean);
+      // Obtener todas las imágenes disponibles
+      currentImages = [
+        product.img01, 
+        product.img02, 
+        product.img03, 
+        product.img04, 
+        product.img05
+      ].filter(Boolean);
+      
       currentIndex = 0;
       updateCarousel();
 
@@ -468,7 +527,7 @@
     document.getElementById("shareBtn").onclick = function() {
       if (!currentProduct) return;
       const base = window.location.origin + window.location.pathname;
-      const link = base + "?producto=" + encodeURIComponent(currentProduct.nombre);
+      const link = base + "?producto=" + encodeURIComponent(currentProduct.Producto);
       const shareUrl = document.getElementById("shareUrl");
       shareUrl.value = link;
       navigator.clipboard.writeText(link).then(()=>{
