@@ -8,8 +8,7 @@
   <!-- Librería para leer archivos CSV desde Google Sheets -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
-  <style> 
-   
+  <style>
 
     /* ======== ESTILOS GENERALES ======== */
     body {
@@ -27,9 +26,7 @@
       user-select: none;
       -webkit-touch-callout: none;
 
-      /* Ocultar cursor nativo (usamos el custom) */
-      cursor: none;
-    }
+      
 
     /* Permitir seleccionar/copiar en inputs/textarea si hace falta */
     input, textarea, [contenteditable="true"], [contenteditable=true]{
@@ -224,10 +221,7 @@
   </style>
 </head>
 <body>
-  <!-- Cursor personalizado (no tocar la estructura; puedes cambiar tamaño en :root) -->
-  <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
-
-  <div class="container">
+ 
     <!-- ======== ENCABEZADO PRINCIPAL ======== -->
     <div class="header">
       <h1>🛍️ Elsy Ventas 🐦‍🔥</h1>
@@ -281,7 +275,7 @@
     <img id="lightboxImage" src="">
   </div>
 
-  <!-- ======== JAVASCRIPT (lógica del catálogo + seguridad y cursor) ======== -->
+  <!-- ======== JAVASCRIPT (lógica del catálogo) ======== -->
   <script>
     
       // Ocultar en iframes/limites si pierdes el foco del documento
