@@ -302,26 +302,7 @@
 
   <!-- ======== JAVASCRIPT (lógica del catálogo + seguridad y cursor) ======== -->
   <script>
-    /* ========== BLOQUEOS: clic derecho / copiar / arrastrar ========== */
-    document.addEventListener("contextmenu", e => e.preventDefault());        // clic derecho
-    document.addEventListener("dragstart", e => e.preventDefault());         // arrastrar elementos/imagenes
-    document.addEventListener("copy", e => {
-      const t = e.target;
-      // Permitir copiar desde inputs/textarea si lo deseas; fuera de ellos, bloquear
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      e.preventDefault();
-    });
-
-    /* ========== CURSOR PERSONALIZADO SEGUIDOR ========== */
-    (function(){
-      const cur = document.getElementById('customCursor');
-      // Evitar mostrar cursor custom mientras no hay movimiento (opcional)
-      let visible = false;
-      document.addEventListener('mousemove', (e)=>{
-        if(!visible){ cur.style.display = 'block'; visible = true; }
-        cur.style.left = e.clientX + 'px';
-        cur.style.top  = e.clientY + 'px';
-      });
+    
       // Ocultar en iframes/limites si pierdes el foco del documento
       document.addEventListener('mouseleave', ()=>{ cur.style.display = 'none'; visible = false; });
     })();
