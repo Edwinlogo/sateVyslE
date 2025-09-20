@@ -9,26 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
   <style> 
-    /* ========= CURSOR PERSONALIZADO ========= */
-    :root{
-      --cursor-size: 32px;          /* tamaño visible del cursor */
-      --cursor-hotspot-x: 14px;     /* punto activo X (desde la izquierda) */
-      --cursor-hotspot-y: 9px;     /* punto activo Y (desde arriba) */
-      --cursor-image: url('https://www.freeiconspng.com/uploads/description-cursor-icon-with-shadow-32.png');
-    }
-    .custom-cursor{
-      position: fixed;
-      left: 0; top: 0;
-      width: var(--cursor-size);
-      height: var(--cursor-size);
-      background-image: var(--cursor-image);
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
-      pointer-events: none;          /* no bloquea clics */
-      z-index: 3000;                 /* sobre todo */
-      transform: translate(calc(-1 * var(--cursor-hotspot-x)), calc(-1 * var(--cursor-hotspot-y)));
-    }
+   
 
     /* ======== ESTILOS GENERALES ======== */
     body {
